@@ -114,3 +114,29 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Route to get all files uploaded by a user
+app.get('/api/files', async (req, res) => {
+  try {
+    // In a real implementation, you would filter by user ID from the JWT token
+    const files = await ExcelData.find({}).sort({ uploadDate: -1 });
+    res.status(200).json(files);
+  } catch (error) {
+    console.error('Error fetching files:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Route to get a specific file by ID
+app.get('/api/files/:id', async (req, res) => {
+  try {
+    const file = await ExcelData.findById(req.params.id);
+    if (!file) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+    res.status(200).json(file);
+  } catch (error) {
+    console.error('Error fetching file:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});

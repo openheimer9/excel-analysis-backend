@@ -4,24 +4,42 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-router.post('/signup', async (req, res) => {
-  const { email, password, role } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ email, password: hashedPassword, role });
-  await user.save();
-  res.send({ message: 'User created' });
+// Middleware to verify JWT token
+const authMiddleware = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization').replace('Bearer ', '');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      throw new Error();
+    }
+    
+    req.user = user;
+    req.token = token;
+    next();
+  } catch (error) {
+    res.status(401).send({ error: 'Please authenticate' });
+  }
+};
+
+// Get user profile
+router.get('/profile', authMiddleware, async (req, res) => {
+  res.send(req.user);
 });
 
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).send({ error: 'User not found' });
-
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(400).send({ error: 'Invalid credentials' });
-
-  const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
-  res.send({ token });
+// Get all users (admin only)
+router.get('/users', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).send({ error: 'Access denied' });
+    }
+    
+    const users = await User.find({});
+    res.send(users);
+  } catch (error) {
+    res.status(500).send({ error: 'Server error' });
+  }
 });
 
 module.exports = router;
